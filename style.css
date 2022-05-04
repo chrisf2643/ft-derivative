@@ -1,0 +1,55 @@
+body {
+  font: 13px/13px "Helvetica Neue", Helvetica, Arial, sans-serif;
+  margin: auto;
+  position: relative;
+  width: 960px;
+  height: 1000px;
+}
+form {
+  position: absolute;
+  left: 150px;
+  top: 400px;
+
+}
+.fftInset {
+    position: absolute;
+    left: 550px;
+    top: 300px;
+    width: 300px;
+    height: 150px;
+    border-width: 2px;
+    border-color: black;
+    border: black;
+}
+.hide {
+  display: none;
+}
+.graph {
+  fill: none;
+  stroke: black;
+  stroke-width: 3px;
+  opacity:0.5;
+}
+.graphPrime {
+  fill: none;
+  stroke: green;
+  stroke-width: 3px;
+  opacity:0.5;
+}
+.fftRe {
+  fill: none;
+  stroke: blue;
+  stroke-width: 1px;
+  opacity:0.5;
+}
+.fftIm {
+  fill: none;
+  stroke: red;
+  stroke-width: 1px;
+  opacity:0.5;
+}
+.axis {
+  fill: none;
+  stroke: black;
+  stroke-width: 1px;
+}

@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" type="text/css" href="style.css">
+<style>
+
+</style>
+</head>
+<body>
+<form>
+    <select id=function>
+    </select>
+    <input id=fraction100 type="range" min="0" max = "100" value="0"/>
+
+</form>
+<div id=fftInset class="fftInset"></div>
+<script src="https://d3js.org/d3.v4.min.js"></script>
+<script src="fft.js"></script>
+<script>
+(function() {
+	var
+		//
+		// Set up view port
+		//
+		margin = {top: 40, right: 100, bottom: 40, left: 150},
+		W = 960,
+		H = 500,
+		w = W - margin.left - margin.right,
+		h = H - margin.top - margin.bottom,
+		
+		//
+		// Set up fgraph parameters
+		//
+		fgraphsize = 512,      //number of samples
+		fgraph = [],
+		fprimegraph = [],
+
+		currentfraction = 0.0,
+
+		windowSize = 10,
+		windowHeight = 0.4,
+
+		currFft = [],
+
+		currentFunction = null,
+
+		functions = [],
+		
+		timer = null;
+
+	var sx = d3.scaleLinear()
+	.domain([0, fgraphsize-1])
+	.range([0, w - w / fgraphsize]);
+
+	var svx = d3.scaleLinear()
+	.domain([-windowSize/2, windowSize/2])
+	.range([0, w]);
+
+	var sy = d3.scaleLinear()
+	.domain([-windowHeight/2, windowHeight/2])
+	.range([h, 0]);
+
+	var sfx = d3.scaleLinear()
+	.domain([0, fgraphsize-1])
+	.range([0, 300 - 300/fgraphsize]);
+
+	var sfy = d3.scaleLinear()
+	.domain([-5, 5])
+	.range([150, 0]);
+
+	var yAxisPoints =
+		[{ "x":0, "y":-windowHeight/2}, {"x":0, "y":windowHeight/2}];
+	
+	var data = [];
+	var domain = [];
+
+	var line = d3.line()
+		.x(function(x) { 
+			return sx(x); 
+		})
+		.y(function(x) { return sy(fgraph[x]); });
+
+	var linePrime = d3.line()
+		.x(function(x) { 
+			return sx(x); 
+		})
+		.y(function(x) { return sy(fprimegraph[x].re); });
+
+	var fftReLine = d3.line()
+		.x(function(x) { 
+			return sfx(x); 
+		})
+		.y(function(x) { 
+			return sfy(currFft[x].re); 
+		});
+
+	var fftImLine = d3.line()
+		.x(function(x) { 
+			return sfx(x); 
+		})
+		.y(function(x) { 
+			return sfy(currFft[x].im); 
+		});
+
+	var xAxisLine = d3.line()
+		.x(function(x) {
+			return sx(x);
+		})
+		.y(function(x) { return sy(0); });
+
+	var yAxisLine = d3.line()
+		.x(function(i) { 
+			return svx(i.x);
+		})
+		.y(function(j) { 
+			return sy(j.y); 
+		});
+		
+	var svg = d3.select("body")
+	  .append("svg")
+	  .attr("width", W)
+	  .attr("height", H)
+
+	var svgFt = d3.select("#fftInset")
+	  .append("svg")
+    	  .attr("width", 300)
+	  .attr("height", 150)      
+	  
+	var vis = svg.append("g")
+	   .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+	var visFft = svgFt.append("g");
+
+	var gPath = vis.append("path").attr("class", "graph");
+
+	var gPrimePath = vis.append("path").attr("class", "graphPrime");
+
+	var fftRePath = visFft.append("path").attr("class", "fftRe");
+
+	var fftImPath = visFft.append("path").attr("class", "fftIm");
+
+	var xAxis = vis.append("path").attr("class", "axis");
+
+	var yAxis = vis.append("path").attr("class", "axis");
+
+	function refresh(fraction) {
+		gPath.attr("d", line(domain));
+
+		fprimegraph = fractionalDerivative(fgraph.slice(),fraction);
+
+		xAxis.attr("d", xAxisLine(domain));
+		
+		yAxis.attr("d", yAxisLine(yAxisPoints));				
+		
+		gPrimePath.attr("d", linePrime(domain));
+
+		fftRePath.attr("d", fftReLine(domain));
+		fftImPath.attr("d", fftImLine(domain));
+	}
+
+	function refreshFunction(fn) {
+		var values = fn();
+		for (var i = 0; i < fgraphsize; i++) {	
+			fgraph[i] = values[i]; 
+			domain[i] = i;
+		}
+		data.length = fgraphsize;
+		domain.length = fgraphsize;
+	}
+
+	function fractionalDerivative(values, fraction) {
+		var fft = cfft(values);
+		var arg = fraction * Math.PI / 2;
+		var fftPrime = [];
+		var halfsize = fgraphsize / 2;
+
+		for (var i = 0; i <= halfsize; i++) {
+			var mag = Math.pow(2 * Math.PI * i / windowSize, fraction);
+			var d = new Complex(mag * Math.cos(arg), mag * Math.sin(arg));
+			fftPrime[i] = fft[i].mul(d, new Complex(0,0));
+			currFft[i] = new Complex(fftPrime[i].re, fftPrime[i].im);
+			if (i > 0) {
+				fftPrime[fgraphsize - i] = new Complex(fftPrime[i].re, -fftPrime[i].im);
+				currFft[fgraphsize - i] = new Complex(fftPrime[fgraphsize - i].re, fftPrime[fgraphsize - i].im);
+			}
+		}
+
+		return icfft(fftPrime)
+	}
+
+
+	functions["Gaussian Sine"] = () => {
+		var result = [];
+		for (var i = 0; i < fgraphsize; i++) {
+			var x = -windowSize/2 + i / (fgraphsize/windowSize);
+			result[i] = 0.05 * Math.exp(-x * x) * Math.sin(3*x);
+		}
+		return result;
+	}
+
+	functions["Sine (scaled)"] = () => {
+		var result = [];
+		for (var i = 0; i < fgraphsize; i++) {
+			var x = -windowSize/2 + i / (fgraphsize/windowSize);
+			//if(Math.abs(x) > 10e-15) {
+				result[i] = 0.08*windowHeight/2 * (Math.sin(2*Math.PI*0.5*x))  ;
+			//} else {
+			//	result[i] = windowHeight/2;
+			//}
+		}
+		return result;
+	}
+
+	functions["Heaviside"] = () => {
+		var result = [];
+		for (var i = 0; i < fgraphsize; i++) {
+			var x = -windowSize/2 + i / (fgraphsize/windowSize);
+			//result[i] = 0.05 * Math.exp(-x * x) * Math.sin(x);
+			if (x > -0.5 && x < 0.5) {
+				result[i] = 0.1*windowHeight/2;
+			} else {
+				result[i] = 0;
+			}
+		}
+		return result;
+	}
+	
+	functions["Constant"] = () => {
+		var result = [];
+		for (var i = 0; i < fgraphsize; i++) {
+			result[i] = windowHeight/2;
+		}
+		return result;
+	}	
+
+	Object.keys(functions).forEach(function(key) {
+		var option = d3.select("#function").append("option");
+
+		option.text(key);
+		option.attr("value", key);
+	});
+
+
+	refreshFunction(functions["Gaussian Sine"]);
+
+	d3.select("#fraction100").on("input", function(d){
+		currentfraction = this.value / 100;
+		refresh(currentfraction);
+	});
+
+	d3.select("#function").on("change", function(d) {
+		currentFunction = this.value;
+		refreshFunction(functions[this.value]);
+		//currentfraction = 0;
+		refresh(currentfraction);
+	});
+
+	refresh(0);
+	//play();
+
+})();
+</script>
+</body>
